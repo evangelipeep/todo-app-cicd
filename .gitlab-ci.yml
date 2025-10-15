@@ -1,0 +1,14 @@
+stages:
+  - test
+
+cache:
+  paths:
+    - node_modules/
+
+test_job:
+  stage: test
+  image: node:20
+  script:
+    - npm ci
+    - npm run test -- --watchAll=false
+    - npx cypress run
