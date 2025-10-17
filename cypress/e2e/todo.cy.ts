@@ -4,13 +4,13 @@ describe("Todo App", () => {
   });
 
   it("Добавление задачи", () => {
-    cy.get("input").type("Первая задача");
+    cy.get(".todo-input").type("Первая задача");
     cy.contains("Добавить").click();
     cy.contains("Первая задача").should("exist");
   });
 
   it("Отметка задачи выполненной", () => {
-    cy.get("input").type("Вторая задача");
+    cy.get(".todo-input").type("Вторая задача");
     cy.contains("Добавить").click();
     cy.get("input[type='checkbox']").click();
     cy.contains("Вторая задача").should(
@@ -21,7 +21,7 @@ describe("Todo App", () => {
   });
 
   it("Удаление задачи", () => {
-    cy.get("input").type("Третья задача");
+    cy.get(".todo-input").type("Третья задача");
     cy.contains("Добавить").click();
     cy.contains("Удалить").click();
     cy.contains("Третья задача").should("not.exist");
