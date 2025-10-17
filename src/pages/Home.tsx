@@ -30,7 +30,8 @@ export const Home: React.FC = () => {
       <h2>Мои задачи</h2>
       <div className="p-d-flex p-ai-center p-mb-3">
         <InputText
-          className="todo-input p-mr-2"
+          data-cy="todo-input"
+          className="p-mr-2"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Введите задачу"
