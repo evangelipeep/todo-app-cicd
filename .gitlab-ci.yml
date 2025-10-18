@@ -19,7 +19,7 @@ cache:
 # 1) устанавливаем зависимости один раз (артефакт node_modules)
 install_dependencies:
   stage: install
-  image: node:18
+  image: node:20
   script:
     - npm ci
   artifacts:
@@ -33,7 +33,7 @@ install_dependencies:
 # 2) Unit tests (Jest) — быстрые, прогоняем на dev/main и при MR
 unit_tests:
   stage: test
-  image: node:18
+  image: node:20
   needs:
     - job: install_dependencies
       artifacts: true
