@@ -37,6 +37,24 @@ unit_tests_job:
   script:
     - echo "--- Unit Tests Started ---"
     - npm test -- --watchAll=false
+    - echo "✅ Unit tests passed" >> $LOG_FILE_NAME
+
+#  E2E-тесты (Cypress)
+e2e_tests_job:
+  stage: test
+  image: cypress/browsers:node20.10.0-chrome114-ff115
+  needs: [build_job]
+  script:
+    - echo "--- E2E Tests Started ---"
+    - npm ci
+    - npm start &
+    - npx wait-on http://localhost:3000
+    - npx cypress run
+    - echo "✅ E2E tests passed" >> $LOG_FILE_NAME
+
+#  Деплой на dev
+deploy_to_dev_job:
+  stage: deploy_dev
   rules:
     - if: $CI_COMMIT_BRANCH == "dev"
   script:
