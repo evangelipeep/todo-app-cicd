@@ -1,27 +1,77 @@
-stages: # определяем этапы пайплайна
+# .gitlab-ci.yml
+image: node:18
+
+stages:
   - install
   - test
+  - e2e
 
 variables:
-  CI: "true" # чтобы npm понимал, что мы в CI
+  CI: "true"
+  CYPRESS_BASE_URL: "http://localhost:3000"
 
+# кешируем node_modules чтобы ускорить последующие джобы
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules/
+
+# 1) устанавливаем зависимости один раз (артефакт node_modules)
 install_dependencies:
   stage: install
   image: node:18
   script:
-    - npm ci # устанавливаем зависимости
+    - npm ci
+  artifacts:
+    paths:
+      - node_modules/
+    expire_in: 1 hour
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - when: always
 
+# 2) Unit tests (Jest) — быстрые, прогоняем на dev/main и при MR
 unit_tests:
   stage: test
   image: node:18
+  needs:
+    - job: install_dependencies
+      artifacts: true
   script:
-    - npm test -- --watchAll=false # запускаем Jest без watch
+    - npm test -- --watchAll=false
+  rules:
+    # запускается на merge requests
+    - if: $CI_MERGE_REQUEST_IID
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - when: never
 
+# 3) E2E tests (Cypress) — тяжелее, запускаем на dev и при MR
 e2e_tests:
-  stage: test
+  stage: e2e
   image: cypress/browsers:node18.16.0-chrome113-ff113
+  needs:
+    - job: install_dependencies
+      artifacts: true
+  variables:
+    # Доп. таймауты можно увеличить при необходимости
+    CYPRESS_RECORD_KEY: ""
+  before_script:
+    - export CI=true
   script:
-    - npm ci
     - npm start & # запускаем dev-сервер в фоне
-    - npx wait-on http://localhost:3000 # ждём пока сервер стартует
-    - npx cypress run # запускаем E2E тесты
+    - npx wait-on $CYPRESS_BASE_URL # ждём пока сервер станет доступен
+    - npx cypress run --config baseUrl=$CYPRESS_BASE_URL
+  artifacts:
+    when: always
+    reports:
+      junit: cypress/results/junit/results-*.xml
+    paths:
+      - cypress/screenshots/
+      - cypress/videos/
+      - cypress/results/
+    expire_in: 1 day
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+    - when: never
