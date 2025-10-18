@@ -42,7 +42,7 @@ unit_tests_job:
 #  E2E-тесты (Cypress)
 e2e_tests_job:
   stage: test
-  image: cypress/browsers:node20.11.1-chrome122-ff123
+  image: cypress/browsers:node20.10.0-chrome114-ff115
   needs: [build_job]
   script:
     - echo "--- E2E Tests Started ---"
