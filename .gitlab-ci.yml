@@ -49,7 +49,7 @@ e2e_tests_job:
     - npm ci
     - npm start &
     - npx wait-on http://localhost:3000
-    - npx cypress run
+    - npx cypress run --config-file cypress.config.ts
     - echo "✅ E2E tests passed" >> $LOG_FILE_NAME
 
 #  Деплой на dev
