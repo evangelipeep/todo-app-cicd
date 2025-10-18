@@ -1,3 +1,8 @@
+---
+#-------------------------------------------
+# GitLab CI/CD Pipeline for Todo App
+#-------------------------------------------
+
 stages:
   - build
   - test
@@ -8,10 +13,10 @@ stages:
 variables:
   CICD_VERSION: "v1.0"
   LOG_FILE_NAME: "$CI_COMMIT_BRANCH-$CI_COMMIT_SHORT_SHA.txt"
-  CI: "true"
 
 image: node:20
 
+# Артефакты и кэш для всех job
 default:
   artifacts:
     paths:
@@ -22,14 +27,20 @@ default:
     paths:
       - node_modules/
 
+# -------------------------------------------
+# Сборка проекта
+# -------------------------------------------
 build_job:
   stage: build
   script:
     - echo "--- Build Started ---"
-    - npm install --legacy-peer-deps
+    - npm install
     - npm run build
     - echo "✅ Build completed on branch $CI_COMMIT_BRANCH" >> $LOG_FILE_NAME
 
+# -------------------------------------------
+# Unit-тесты (Jest)
+# -------------------------------------------
 unit_tests_job:
   stage: test
   needs: [build_job]
@@ -38,21 +49,26 @@ unit_tests_job:
     - npm test -- --watchAll=false
     - echo "✅ Unit tests passed" >> $LOG_FILE_NAME
 
+# -------------------------------------------
+# E2E-тесты (Cypress)
+# -------------------------------------------
 e2e_tests_job:
   stage: test
-  image: cypress/browsers:node-20.5.0-chrome-114-ff114
+  image: cypress/browsers:node-20.5.0-chrome-114.0.5735.133-1-ff-114.0.2-edge-114.0.1823.51-1
   needs: [build_job]
   script:
     - echo "--- E2E Tests Started ---"
-    - npm install --legacy-peer-deps
+    - npm ci
     - npm start &
     - npx wait-on http://localhost:3000
-    - npx cypress run --config-file cypress.config.js
+    - npx cypress run --config-file cypress.config.ts
     - echo "✅ E2E tests passed" >> $LOG_FILE_NAME
 
+# -------------------------------------------
+# Деплой на dev
+# -------------------------------------------
 deploy_to_dev_job:
   stage: deploy_dev
-  needs: [unit_tests_job, e2e_tests_job]
   rules:
     - if: $CI_COMMIT_BRANCH == "dev"
   script:
@@ -60,9 +76,11 @@ deploy_to_dev_job:
     - echo "🚀 Deploying to DEV environment..."
     - echo "✅ Deploy to DEV completed" >> $LOG_FILE_NAME
 
+# -------------------------------------------
+# Деплой на main (production)
+# -------------------------------------------
 deploy_to_prod_job:
   stage: deploy_prod
-  needs: [unit_tests_job, e2e_tests_job]
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
   script:
@@ -70,9 +88,16 @@ deploy_to_prod_job:
     - echo "🚀 Deploying to PRODUCTION environment..."
     - echo "✅ Deploy to PROD completed" >> $LOG_FILE_NAME
 
+# -------------------------------------------
+# Финальный лог
+# -------------------------------------------
 finish_job:
   stage: finish
-  needs: [deploy_to_dev_job, deploy_to_prod_job]
+  needs:
+    - job: deploy_to_dev_job
+      optional: true
+    - job: deploy_to_prod_job
+      optional: true
   script:
     - echo "--- Finish Job Started ---"
     - echo "📦 Pipeline $CICD_VERSION finished by branch $CI_COMMIT_BRANCH" >> $LOG_FILE_NAME
