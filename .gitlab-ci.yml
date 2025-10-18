@@ -1,77 +1,81 @@
-# .gitlab-ci.yml
-image: node:20
-
 stages:
-  - install
+  - build
   - test
-  - e2e
+  - deploy_dev
+  - deploy_prod
+  - finish
 
 variables:
-  CI: "true"
-  CYPRESS_BASE_URL: "http://localhost:3000"
+  CICD_VERSION: "v1.0"
+  LOG_FILE_NAME: "$CI_COMMIT_BRANCH-$CI_COMMIT_SHORT_SHA.txt"
 
-# кешируем node_modules чтобы ускорить последующие джобы
-cache:
-  key: ${CI_COMMIT_REF_SLUG}
-  paths:
-    - node_modules/
+image: node:20
 
-# 1) устанавливаем зависимости один раз (артефакт node_modules)
-install_dependencies:
-  stage: install
-  image: node:20
-  script:
-    - npm ci
+#  Артефакты для всех job
+default:
   artifacts:
+    paths:
+      - $LOG_FILE_NAME
+    when: always
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
     paths:
       - node_modules/
-    expire_in: 1 hour
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push"
-    - when: always
 
-# 2) Unit tests (Jest) — быстрые, прогоняем на dev/main и при MR
-unit_tests:
+#  Сборка проекта
+build_job:
+  stage: build
+  script:
+    - echo "--- Build Started ---"
+    - npm install
+    - npm run build
+    - echo "✅ Build completed on branch $CI_COMMIT_BRANCH" >> $LOG_FILE_NAME
+
+#  Unit-тесты (Jest)
+unit_tests_job:
   stage: test
-  image: node:20
-  needs:
-    - job: install_dependencies
-      artifacts: true
   script:
+    - echo "--- Unit Tests Started ---"
     - npm test -- --watchAll=false
-  rules:
-    # запускается на merge requests
-    - if: $CI_MERGE_REQUEST_IID
-    - if: '$CI_COMMIT_BRANCH == "dev"'
-    - if: '$CI_COMMIT_BRANCH == "main"'
-    - when: never
+    - echo "✅ Unit tests passed" >> $LOG_FILE_NAME
 
-# 3) E2E tests (Cypress) — тяжелее, запускаем на dev и при MR
-e2e_tests:
-  stage: e2e
-  image: cypress/browsers:node18.16.0-chrome113-ff113
-  needs:
-    - job: install_dependencies
-      artifacts: true
-  variables:
-    # Доп. таймауты можно увеличить при необходимости
-    CYPRESS_RECORD_KEY: ""
-  before_script:
-    - export CI=true
+#  E2E-тесты (Cypress)
+e2e_tests_job:
+  stage: test
+  image: cypress/browsers:node20.11.1-chrome122-ff123
+  needs: [build_job]
   script:
-    - npm start & # запускаем dev-сервер в фоне
-    - npx wait-on $CYPRESS_BASE_URL # ждём пока сервер станет доступен
-    - npx cypress run --config baseUrl=$CYPRESS_BASE_URL
-  artifacts:
-    when: always
-    reports:
-      junit: cypress/results/junit/results-*.xml
-    paths:
-      - cypress/screenshots/
-      - cypress/videos/
-      - cypress/results/
-    expire_in: 1 day
+    - echo "--- E2E Tests Started ---"
+    - npm ci
+    - npm start &
+    - npx wait-on http://localhost:3000
+    - npx cypress run
+    - echo "✅ E2E tests passed" >> $LOG_FILE_NAME
+
+#  Деплой на dev
+deploy_to_dev_job:
+  stage: deploy_dev
   rules:
-    - if: $CI_MERGE_REQUEST_IID
-    - if: '$CI_COMMIT_BRANCH == "dev"'
-    - when: never
+    - if: $CI_COMMIT_BRANCH == "dev"
+  script:
+    - echo "--- Deploy to DEV Started ---"
+    - echo "🚀 Deploying to DEV environment..."
+    - echo "✅ Deploy to DEV completed" >> $LOG_FILE_NAME
+
+#  Деплой на main (прод)
+deploy_to_prod_job:
+  stage: deploy_prod
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  script:
+    - echo "--- Deploy to PROD Started ---"
+    - echo "🚀 Deploying to PRODUCTION environment..."
+    - echo "✅ Deploy to PROD completed" >> $LOG_FILE_NAME
+
+#  Финальный лог
+finish_job:
+  stage: finish
+  script:
+    - echo "--- Finish Job Started ---"
+    - echo "📦 Pipeline $CICD_VERSION finished by branch $CI_COMMIT_BRANCH" >> $LOG_FILE_NAME
+    - cat $LOG_FILE_NAME
