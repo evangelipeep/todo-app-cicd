@@ -4,7 +4,12 @@ export default defineConfig({
   e2e: {
     baseUrl: "http://localhost:3000",
     setupNodeEvents(on, config) {
-      // реализуем прослушиватели событий узла здесь
+      on("task", {
+        log(message) {
+          console.log("📢 Лог из Cypress:", message);
+          return null;
+        },
+      });
     },
   },
 });

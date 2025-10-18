@@ -1,14 +1,27 @@
-stages:
+stages: # определяем этапы пайплайна
+  - install
   - test
 
-cache:
-  paths:
-    - node_modules/
+variables:
+  CI: "true" # чтобы npm понимал, что мы в CI
 
-test_job:
+install_dependencies:
+  stage: install
+  image: node:18
+  script:
+    - npm ci # устанавливаем зависимости
+
+unit_tests:
   stage: test
-  image: node:20
+  image: node:18
+  script:
+    - npm test -- --watchAll=false # запускаем Jest без watch
+
+e2e_tests:
+  stage: test
+  image: cypress/browsers:node18.16.0-chrome113-ff113
   script:
     - npm ci
-    - npm run test -- --watchAll=false
-    - npx cypress run
+    - npm start & # запускаем dev-сервер в фоне
+    - npx wait-on http://localhost:3000 # ждём пока сервер стартует
+    - npx cypress run # запускаем E2E тесты
